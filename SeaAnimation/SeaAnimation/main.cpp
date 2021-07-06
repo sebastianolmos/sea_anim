@@ -1,8 +1,11 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <stb_image.h>
 
 #include "shader/shader.h"
 #include "util/performanceMonitor.h"
+#include "util/camera3d.h"
+#include "util/model.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
@@ -14,12 +17,26 @@
 using namespace std;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window, bool* fill);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void processInput(GLFWwindow* window);
 static void draw_vec3_widget(const std::string& label, glm::vec3& values, float columnWidth);
+void createSeaMesh(float*& vertices, unsigned int*& indices, unsigned int N, int xGap, int yGap, glm::vec3 initPos, float sizeUV);
 
 // settings
 const unsigned int SCR_WIDTH = 1024;
 const unsigned int SCR_HEIGHT = 720;
+
+// camera
+Camera3D camera(glm::vec3(0.0f, 0.0f, 0.0f));
+float lastX = SCR_WIDTH / 2.0f;
+float lastY = SCR_HEIGHT / 2.0f;
+bool firstMouse = true;
+
+// timing
+float deltaTime = 0.0f;	// time between current frame and last frame
+float lastFrame = 0.0f;
 
 int main()
 {
@@ -34,7 +51,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    string title = "Simple Quad";
+    string title = "Sea animation";
     // glfw window creation
     // --------------------
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, title.c_str(), NULL, NULL);
@@ -46,6 +63,9 @@ int main()
     }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetScrollCallback(window, scroll_callback);
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -55,50 +75,72 @@ int main()
         return -1;
     }
 
+    // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
+    //stbi_set_flip_vertically_on_load(true);
+
+    // configure global opengl state
+    // -----------------------------
+    glEnable(GL_DEPTH_TEST);
 
     // build and compile our shader program
     // ------------------------------------
-    Shader basicShader("shader/basicShader.vs", "shader/basicShader.fs"); // you can name your shader files however you like
+    Shader shipShader("shader/lightTexMVPShader.vs", "shader/lightTexMVPShader.fs"); // you can name your shader files however you like
 
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
+    Model shipModel("../assets/viking_ship/ship.obj");
 
-    float vertices[] = {
-        // positions         // colors
-         0.5f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  // top right
-         0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f,  // bottom left
-        -0.5f,  0.5f, 0.0f,  1.0f, 1.0f, 1.0f   // top left 
-    };
+    // Shader para el mar
+    Shader seaShader("shader/seaShader.vs", "shader/seaShader.fs");
 
-    unsigned int indices[] = {  // note that we start from 0!
-        0, 1, 3,  // first Triangle
-        1, 2, 3   // second Triangle
-    };
+    float* seaVertices;
+    unsigned int* seaIndices;
+    unsigned int seaSize = 128;
+    createSeaMesh(seaVertices, seaIndices, seaSize, 1, 1, glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
+    unsigned int seaVBO, seaVAO, seaEBO;
+    glGenVertexArrays(1, &seaVAO);
+    glGenBuffers(1, &seaVBO);
+    glGenBuffers(1, &seaEBO);
 
-    unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
-    glBindVertexArray(VAO);
+    glBindVertexArray(seaVAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, seaVBO);
+    glBufferData(GL_ARRAY_BUFFER, (seaSize * seaSize)*5*sizeof(float), seaVertices, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, seaEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (seaSize - 1) * (seaSize - 1) * 3 * sizeof(unsigned int), seaIndices, GL_STATIC_DRAW);
 
     // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    // color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    // texture coord attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    glBindVertexArray(0);
+    // load and create a texture 
+    // -------------------------
+    unsigned int texture1;
+    glGenTextures(1, &texture1);
+    glBindTexture(GL_TEXTURE_2D, texture1);
+    // set the texture wrapping parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load image, create texture and generate mipmaps
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load("../assets/displacement1.jpg", &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
 
-    // glEnable(GL_DEPTH_TEST);
+
 
         // GL 3.0 + GLSL 130
     const char* glsl_version = "#version 410";
@@ -156,7 +198,7 @@ int main()
     glBindTexture(GL_TEXTURE_2D, mTexId);
 
     int32_t mWidth = 800;
-    int32_t mHeight = 600;
+    int32_t mHeight = 800;
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, mWidth, mHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -192,6 +234,7 @@ int main()
     float mRoughness = 0.2f;
     float mMetallic = 0.1f;
     glm::vec3 mPosition = { 1.5f, 3.5f, 3.0f };
+    glm::vec2 mSize = { 800, 800 };
 
     bool fillPolygon = true;
     // render loop
@@ -205,14 +248,13 @@ int main()
 
         // input
         // -----
-        processInput(window, &fillPolygon);
+        processInput(window);
 
         // prerender openglcontext
         // ------
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // prerender uicontext
         ImGui_ImplOpenGL3_NewFrame();
@@ -241,30 +283,74 @@ int main()
         ImGui::DockSpace(dockSpaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
         ImGui::End();
 
-        // render scene to framebuffer and add it to scene view
-        if (fillPolygon)
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        else
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
         // render the triangle
-        basicShader.use();
+        
 
         // bind framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
         glViewport(0, 0, mWidth, mHeight);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glBindVertexArray(VAO);
-        // glDrawArrays(GL_TRIANGLES, 0, 3);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        shipShader.use();
+
+        // view/projection transformations
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Fovy), (float)mSize.x / (float)mSize.y, 0.1f, 100.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        shipShader.setMat4("projection", projection);
+        shipShader.setMat4("view", view);
+
+        // render the loaded model
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
+        model = glm::scale(model, glm::vec3(0.1f, 0.1f, 0.1f));	// it's a bit too big for our scene, so scale it down
+        shipShader.setMat4("model", model);
+        shipModel.Draw(shipShader);
+
+
+        // Draw the sea
+        seaShader.use();
+        // bind textures on corresponding texture units
+        glBindTexture(GL_TEXTURE_2D, texture1);
+        glm::vec3 lightDirection = glm::vec3(-1.0f, 0.0f, -1.0f);
+        seaShader.setVec3("light.direction", lightDirection);
+        seaShader.setVec3("viewPos", camera.Position);
+
+        // light properties
+        glm::vec3 lightColor;
+        lightColor.x = 1.0f;
+        lightColor.y = 1.0f;
+        lightColor.z = 1.0f;
+        glm::vec3 diffuseColor = lightColor * glm::vec3(0.5f); // decrease the influence
+        glm::vec3 ambientColor = diffuseColor * glm::vec3(0.2f); // low influence
+        seaShader.setVec3("light.ambient", ambientColor);
+        seaShader.setVec3("light.diffuse", diffuseColor);
+        seaShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
+
+        // material properties
+        seaShader.setVec3("material.ambient", 0.1f, 0.1f, 0.4f);
+        seaShader.setVec3("material.diffuse", 0.3f, 0.3f, 1.0f);
+        seaShader.setVec3("material.specular", 0.5f, 0.5f, 0.5f); // specular lighting doesn't have full effect on this object's material
+        seaShader.setFloat("material.shininess", 32.0f);
+
+        // view/projection transformations
+        seaShader.setMat4("projection", projection);
+        seaShader.setMat4("view", view);
+
+        // world transformation
+        glm::mat4 seaModel = glm::mat4(1.0f);
+        seaShader.setMat4("model", seaModel);
+
+        // render the cube
+        glBindVertexArray(seaVAO);
+        glDrawElements(GL_TRIANGLES, (seaSize - 1)* (seaSize - 1) * 3, GL_UNSIGNED_INT, 0);
+
 
         // unbind framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         ImGui::Begin("Scene");
         ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
-        glm::vec2 mSize = { viewportPanelSize.x, viewportPanelSize.y };
+        mSize = { viewportPanelSize.x, viewportPanelSize.y };
 
         // add rendered texture to ImGUI scene window
         ImGui::Image(reinterpret_cast<void*>(mTexId), ImVec2{ mSize.x, mSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
@@ -301,19 +387,20 @@ int main()
             glfwMakeContextCurrent(backup_current_context);
         }
 
+
         // Render end, swap buffers
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
-        glfwSwapBuffers(window);
         glfwPollEvents();
+        glfwSwapBuffers(window);
     }
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    //glDeleteVertexArrays(1, &VAO);
+    //glDeleteBuffers(1, &VBO);
+    //glDeleteBuffers(1, &EBO);
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -340,14 +427,6 @@ void processInput(GLFWwindow* window, bool* fill)
         *fill = true;
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    // make sure the viewport matches the new window dimensions; note that width and 
-    // height will be significantly larger than specified on retina displays.
-    glViewport(0, 0, width, height);
-}
 
 static void draw_vec3_widget(const std::string& label, glm::vec3& values, float columnWidth = 100.0f)
 {
@@ -384,4 +463,103 @@ static void draw_vec3_widget(const std::string& label, glm::vec3& values, float 
     ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f");
     ImGui::PopItemWidth();
     ImGui::PopStyleVar();
+}
+
+// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
+// ---------------------------------------------------------------------------------------------------------
+void processInput(GLFWwindow* window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera.ProcessKeyboardMovement(FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera.ProcessKeyboardMovement(BACKWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera.ProcessKeyboardMovement(LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera.ProcessKeyboardMovement(RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+        camera.ProcessKeyboardMovement(ORIGIN, deltaTime);
+
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        camera.ProcessKeyboardRotation(AZIM_UP, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        camera.ProcessKeyboardRotation(AZIM_DOWN, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        camera.ProcessKeyboardRotation(ZEN_LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        camera.ProcessKeyboardRotation(ZEN_RIGHT, deltaTime);
+}
+
+// glfw: whenever the window size changed (by OS or user resize) this callback function executes
+// ---------------------------------------------------------------------------------------------
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    // make sure the viewport matches the new window dimensions; note that width and 
+    // height will be significantly larger than specified on retina displays.
+    glViewport(0, 0, width, height);
+}
+
+// glfw: whenever the mouse scroll wheel scrolls, this callback is called
+// ----------------------------------------------------------------------
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    camera.ProcessMouseScroll(yoffset);
+}
+
+// glfw: whenever the mouse moves, this callback is called
+// -------------------------------------------------------
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    float posX = 2 * (xpos - SCR_WIDTH / 2) / SCR_WIDTH;
+    float posY = 2 * (SCR_HEIGHT / 2 - ypos) / SCR_HEIGHT;
+    camera.SetCurrentMousePos(posX, posY);
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        camera.SetRotDrag(true);
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+    {
+        camera.SetRotDrag(false);
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+    {
+        camera.SetCenterDrag(true);
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE)
+    {
+        camera.SetCenterDrag(false);
+    }
+}
+
+void createSeaMesh(float*& vertices, unsigned int*& indices, unsigned int N, int xGap, int yGap, glm::vec3 initPos, float sizeUV) {
+    int vertexSize = 5;
+    int indexSize = 3;
+    vertices = new float[N * N * vertexSize];
+    indices = new unsigned int[(N - 1)*(N - 1) * 2 * indexSize];
+
+    for (unsigned int j = 0; j < N; j++) {
+        for (unsigned int i = 0; i < N; i++) {
+            float tempv[] = {
+                initPos.x + i * xGap, initPos.y + j *yGap, initPos.z, 
+                0.0f + ((float)i/(float)N) * sizeUV, sizeUV - ((float)j / (float)N) * sizeUV };
+            copy(tempv, tempv + (1 * vertexSize), (vertices + (j*N + i) * vertexSize));
+
+            if ( (j < N - 1) && (i < N - 1) ) {
+                unsigned int tempi[] = {
+                    (j * N + i), (j * N + (i + 1)), ((j+1) * N + (i+1)),
+                    ((j + 1) * N + (i + 1)), ((j + 1) * N + (i + 0)), ((j + 0) * N + (i + 0)) };
+                copy(tempi, tempi + (2 * indexSize), (indices + (j * (N - 1) + i) * 2 * indexSize));
+            }
+        }
+    }
 }

@@ -45,6 +45,9 @@
     <ClCompile Include="glad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="stb.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imgui\imconfig.h">
@@ -83,9 +86,24 @@
     <ClInclude Include="shader\shader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="util\camera3d.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="util\mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="util\model.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader\basicShader.fs" />
     <None Include="shader\basicShader.vs" />
+    <None Include="shader\MVPTexShader.vs" />
+    <None Include="shader\MVPTexShader.fs" />
+    <None Include="shader\lightTexMVPShader.vs" />
+    <None Include="shader\lightTexMVPShader.fs" />
+    <None Include="shader\seaShader.vs" />
+    <None Include="shader\seaShader.fs" />
   </ItemGroup>
 </Project>
