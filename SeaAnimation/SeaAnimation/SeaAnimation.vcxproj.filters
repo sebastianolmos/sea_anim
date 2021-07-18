@@ -95,6 +95,9 @@
     <ClInclude Include="util\model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="util\shipMovement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader\basicShader.fs" />
@@ -105,5 +108,7 @@
     <None Include="shader\lightTexMVPShader.fs" />
     <None Include="shader\seaShader.vs" />
     <None Include="shader\seaShader.fs" />
+    <None Include="shader\shipShader.vs" />
+    <None Include="shader\shipShader.fs" />
   </ItemGroup>
 </Project>

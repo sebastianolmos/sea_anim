@@ -35,7 +35,7 @@ const float FOVY = 45.0f;
 const float THETA = 90.0f;
 const float PHI = 0.0f;
 const float ROTATION = 60.0f;
-const float ROTATION_SENS = 50.0f;
+const float ROTATION_SENS = 60.0f;
 const float CENTER_SENS = 2.0f;
 
 
@@ -68,6 +68,7 @@ public:
     float lastPhi;
     float rotSensitivity;
     bool rotDrag;
+    float screenOffset;
 
     // constructor with vectors
     Camera3D(glm::vec3 center = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f), float rad = 10.0f, float theta = THETA) :
@@ -85,6 +86,7 @@ public:
         rotSensitivity(ROTATION_SENS),
         centerSensitivty(CENTER_SENS)
     {
+        screenOffset = -0.5;
         Center = center;
         WorldUp = up;
         Radius = rad;
@@ -152,43 +154,49 @@ public:
     // processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
     void ProcessMouseScroll(float yoffset)
     {
-        Radius -= (float)yoffset;
-        if (Radius < 1.0f)
-            Radius = 1.0f;
-        if (Radius > 45.0f)
-            Radius = 45.0f;
+        if (CurrentMousePos.x > screenOffset)
+        {
+            Radius -= (float)yoffset * 1.0f;
+            if (Radius < 1.0f)
+                Radius = 1.0f;
+            if (Radius > 45.0f)
+                Radius = 45.0f;
+        }
+        
     }
 
     void SetRotDrag(bool value)
     {
-        if (!rotDrag && value)
-        {
-            LastMousePos = CurrentMousePos;
-            lastTheta = Theta;
-            lastPhi = Phi;
-        }
-
-        //if (rotDrag && !value)
-        //{
-            //Phi += (CurrentMousePos.x - LastMousePos.x);
-            //Theta += (CurrentMousePos.y - LastMousePos.y);
-        //}
         rotDrag = value;
     }
 
     void SetCenterDrag(bool value)
     {
-        if (!centerDrag && value)
-        {
-            LastMousePos = CurrentMousePos;
-            lastCenterPos = Center;
-        }
         centerDrag = value;
     }
 
 
     void SetCurrentMousePos(float xPos, float yPos)
     {
+        glm::vec2 pos2d{ xPos, yPos };
+        if (rotDrag && (xPos > screenOffset))
+        {
+            glm::vec2 delta = (pos2d - CurrentMousePos);
+            Phi -= delta.x * rotSensitivity;
+            Theta += delta.y * rotSensitivity;
+        }
+        if (Theta > 179.0f)
+            Theta = 179.0f;
+        if (Theta < 01.0f)
+            Theta = 01.0f;
+
+        if (centerDrag && (yPos > screenOffset))
+        {
+            glm::vec2 delta = (pos2d - CurrentMousePos) * -1.0f;
+            Center += Right * delta.x * centerSensitivty  * Radius /4.0f
+                + Front * delta.y * centerSensitivty * Radius /4.0f;
+        }
+
         CurrentMousePos.x = xPos;
         CurrentMousePos.y = yPos;
         updateCameraVectors();
@@ -198,19 +206,6 @@ private:
     // calculates the front vector from the Camera's (updated) Euler Angles
     void updateCameraVectors()
     {
-        if (rotDrag)
-        {
-            Phi = lastPhi - +(CurrentMousePos.x - LastMousePos.x) * rotSensitivity;
-            Theta = lastTheta + (CurrentMousePos.y - LastMousePos.y) * rotSensitivity;
-        }
-
-        if (centerDrag)
-        {
-
-            Center = lastCenterPos + Right * (LastMousePos.x - CurrentMousePos.x) * centerSensitivty
-                + Front * (LastMousePos.y - CurrentMousePos.y) * centerSensitivty;
-        }
-
         // calculate the new Front vector
         glm::vec3 front = glm::normalize(Center - Position);
         Front = glm::vec3(front.x, front.y, 0.0f);

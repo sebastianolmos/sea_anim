@@ -204,6 +204,7 @@
     <ClInclude Include="util\mesh.h" />
     <ClInclude Include="util\model.h" />
     <ClInclude Include="util\performanceMonitor.h" />
+    <ClInclude Include="util\shipMovement.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shader\basicShader.fs" />
@@ -214,6 +215,8 @@
     <None Include="shader\MVPTexShader.vs" />
     <None Include="shader\seaShader.fs" />
     <None Include="shader\seaShader.vs" />
+    <None Include="shader\shipShader.fs" />
+    <None Include="shader\shipShader.vs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
