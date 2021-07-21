@@ -32,9 +32,9 @@ const float SPEED = 2.5f;
 const float SENSITIVITY = 0.1f;
 const float ZOOM = 45.0f;
 const float FOVY = 45.0f;
-const float THETA = 90.0f;
+const float THETA = 50.0f;
 const float PHI = 0.0f;
-const float ROTATION = 60.0f;
+const float ROTATION = 75.0f;
 const float ROTATION_SENS = 60.0f;
 const float CENTER_SENS = 2.0f;
 
@@ -71,7 +71,7 @@ public:
     float screenOffset;
 
     // constructor with vectors
-    Camera3D(glm::vec3 center = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f), float rad = 10.0f, float theta = THETA) :
+    Camera3D(glm::vec3 center = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f), float rad = 30.0f, float theta = THETA) :
         MovementSpeed(SPEED),
         rotationSpeed(ROTATION),
         Phi(PHI), Fovy(FOVY),
@@ -159,8 +159,8 @@ public:
             Radius -= (float)yoffset * 1.0f;
             if (Radius < 1.0f)
                 Radius = 1.0f;
-            if (Radius > 45.0f)
-                Radius = 45.0f;
+            if (Radius > 100.0f)
+                Radius = 100.0f;
         }
         
     }
