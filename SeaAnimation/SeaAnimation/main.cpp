@@ -36,7 +36,6 @@ Menu guiMenu = Menu();
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
-float lastFrame = 0.0f;
 
 bool globaLView = true;
 string viewName;
@@ -212,10 +211,6 @@ int main()
 
     PerformanceMonitor pMonitor(glfwGetTime(), 0.5f);
 
-    glm::vec3 mColor = { 1.0f, 0.0f, 0.0f };
-    float mRoughness = 0.2f;
-    float mMetallic = 0.1f;
-    glm::vec3 mPosition = { 1.5f, 3.5f, 3.0f };
     glm::vec2 mSize = { 800, 800 };
     bool fillPolygon = true;
 
@@ -273,12 +268,17 @@ int main()
 
     glm::vec3 sky_color = glm::vec3(1.0f);
 
+    float t0 = glfwGetTime();
+    float t1 = t0;
 
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
-        float t1 = glfwGetTime();
+        t0 = glfwGetTime();
+        deltaTime = t1 - t0;
+        t1 = t0;
+
         pMonitor.update(t1);
         stringstream ss;
         ss << title << " " << pMonitor;
@@ -521,7 +521,7 @@ void processInput(GLFWwindow* window, bool* fill)
         camera.ProcessKeyboardMovement(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboardMovement(RIGHT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
         camera.ProcessKeyboardMovement(ORIGIN, deltaTime);
 
     if (globaLView)

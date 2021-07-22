@@ -28,7 +28,7 @@ enum Camera_Rotation {
 };
 
 // Default camera values
-const float SPEED = 2.5f;
+const float SPEED = 20.5f;
 const float SENSITIVITY = 0.1f;
 const float ZOOM = 45.0f;
 const float FOVY = 45.0f;
