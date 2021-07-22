@@ -3,6 +3,9 @@
 ## Descripción
 Tarea 3 realizado en el curso CC7515-1 Computación en GPU. Corresponde a una escena que simula una superficie fluida en tiempo real donde el usuario puede manipular sus parametros, ademas de agregar algun modelo 3D.
 
+## Video
+[![Alt text for your video](https://img.youtube.com/vi/0vI7StoU8IM/0.jpg)](https://youtu.be/0vI7StoU8IM)
+
 ## Librerías usadas
 Se uso el lenguaje C++ con la siguientes librerias:
 - [Glad](https://glad.dav1d.de/) : Libreria necesaria para cargar los punteros a funciones de OpenGL. En este proyecto se uso OpenGL 4.5
